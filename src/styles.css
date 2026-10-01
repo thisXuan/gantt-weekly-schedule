@@ -428,9 +428,9 @@ h2 {
   color: var(--ink);
   font-family: Inter, "Segoe UI", sans-serif;
 }
-.chapter .item-name input { font-size: 15px; font-weight: 700; }
-.section .item-name input { font-size: 14px; font-weight: 650; }
-.task .item-name input { font-size: 13px; font-weight: 500; }
+.chapter .item-name input { font-size: 16px; font-weight: 700; }
+.section .item-name input { font-size: 15px; font-weight: 650; }
+.task .item-name input { font-size: 14px; font-weight: 500; }
 .task .type-mark { color: var(--light-blue); }
 .disclosure { color: var(--muted); }
 .disclosure:hover { color: var(--blue); }
@@ -517,8 +517,8 @@ h2 {
 .bar.section { background: var(--blue); }
 .bar.task { background: var(--light-blue); color: var(--ink); }
 .bar { font-weight: 600; }
-.bar.chapter span { font-size: 12px; font-weight: 700; }
-.bar.section span { font-size: 11px; font-weight: 650; }
+.bar.chapter span { font-size: 13px; font-weight: 700; }
+.bar.section span { font-size: 12px; font-weight: 650; }
 .empty-marker { border-color: var(--blue); background: #f7f9fb; color: var(--blue); }
 .empty-marker.section { color: var(--blue); }
 .empty-marker.task { color: var(--light-blue); }
@@ -611,7 +611,7 @@ h2 {
   outline: 0;
   background: transparent;
   color: var(--ink);
-  font: 650 20px/1.2 Inter, "Segoe UI", sans-serif;
+  font: 650 25px/1.2 Inter, "Segoe UI", sans-serif;
   letter-spacing: -.015em;
 }
 .timeline-title input:hover { border-bottom-color: var(--rule); }
