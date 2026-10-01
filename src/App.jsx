@@ -250,7 +250,7 @@ function App() {
               <div className="grid-lines">{Array.from({ length: weeks }, (_, index) => <i key={index} />)}</div>
               <div className="bars">
                 {rows.map((item) => <div key={item.id} className="bar-row">
-                  {item.durationWeeks > 0 && item.scheduled !== false && <div className={`bar ${item.type}`} style={{ left: item.startWeek * WEEK_WIDTH, width: Math.max(item.durationWeeks * WEEK_WIDTH, 14) }} title={`${item.name}: ${item.startDate} to ${item.endDate}`} aria-label={`${item.name}: ${item.startDate} to ${item.endDate}`} />}
+                  {item.durationWeeks > 0 && item.scheduled !== false && <div className={`bar ${item.type}`} style={{ left: item.startWeek * WEEK_WIDTH, width: Math.max(item.durationWeeks * WEEK_WIDTH, 14) }} title={`${item.name}: ${item.startDate} to ${item.endDate}`} aria-label={`${item.name}: ${item.startDate} to ${item.endDate}`}>{item.type !== 'task' && <span>{item.name}</span>}</div>}
                   {((item.type !== 'task' && !item.durationWeeks) || (item.type === 'task' && item.scheduled === false)) && <div className={`empty-marker ${item.type}`} style={{ left: item.startWeek * WEEK_WIDTH + 25 }} title={item.type === 'task' ? `${item.name}: choose a predecessor` : `${item.name}: starts ${item.startDate}`}><span /></div>}
                 </div>)}
               </div>

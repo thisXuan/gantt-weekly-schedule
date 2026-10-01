@@ -517,6 +517,8 @@ h2 {
 .bar.section { background: var(--blue); }
 .bar.task { background: var(--light-blue); color: var(--ink); }
 .bar { font-weight: 600; }
+.bar.chapter span { font-size: 12px; font-weight: 700; }
+.bar.section span { font-size: 11px; font-weight: 650; }
 .empty-marker { border-color: var(--blue); background: #f7f9fb; color: var(--blue); }
 .empty-marker.section { color: var(--blue); }
 .empty-marker.task { color: var(--light-blue); }
