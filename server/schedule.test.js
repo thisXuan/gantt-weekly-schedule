@@ -40,17 +40,19 @@ test('an empty group can start after an existing task', () => {
   assert.equal(linkedChapter.endWeek, 5)
 })
 
-test('groups with children use the summed child duration', () => {
+test('groups span their children without double-counting overlaps', () => {
   const plan = buildPlan([
     makeRow(1, 'chapter', null, 99, 0),
     makeRow(2, 'section', 1, 88, 0),
     makeRow(3, 'task', 2, 2, 0),
-    makeRow(4, 'task', 2, 3, 1),
+    makeRow(4, 'task', 2, 3, 1, { start_mode: 'section_start' }),
     makeRow(5, 'section', 1, 4, 1, { manual_start_date: '2026-02-09' }),
   ], START)
   const chapter = plan.items[0]
 
-  assert.equal(chapter.children[0].durationWeeks, 5)
+  assert.equal(chapter.children[0].children[0].startWeek, 0)
+  assert.equal(chapter.children[0].children[1].startWeek, 0)
+  assert.equal(chapter.children[0].durationWeeks, 3)
   assert.equal(chapter.children[1].durationWeeks, 4)
   assert.equal(chapter.durationWeeks, 9)
 })

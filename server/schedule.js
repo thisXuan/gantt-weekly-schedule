@@ -152,8 +152,7 @@ export function buildPlan(rows, projectStart) {
       if (childTasks.length) {
         node.startWeek = Math.min(...childTasks.map((task) => task.startWeek))
         node.endWeek = Math.max(...childTasks.map((task) => task.endWeek))
-        node.durationWeeks = childTasks.reduce((total, task) => total + duration(task), 0)
-        node.endWeek = node.startWeek + node.durationWeeks
+        node.durationWeeks = node.endWeek - node.startWeek
         node.startDate = addWeeks(projectStart, node.startWeek)
         node.endDate = addWeeks(projectStart, node.endWeek)
       }
@@ -201,13 +200,13 @@ export function buildPlan(rows, projectStart) {
   }
 
   // A group with children is always derived. Leaf groups retain their own
-  // duration, while parent lengths are the sum of their immediate children.
+  // duration, while parent ranges cover the earliest start through latest end.
   const resummarize = (node) => {
     node.children.forEach(resummarize)
     if (node.type === 'task' || !node.children.length) return
     node.startWeek = Math.min(...node.children.map((child) => child.startWeek))
-    node.durationWeeks = node.children.reduce((total, child) => total + duration(child), 0)
-    node.endWeek = node.startWeek + node.durationWeeks
+    node.endWeek = Math.max(...node.children.map((child) => child.endWeek))
+    node.durationWeeks = node.endWeek - node.startWeek
     node.startDate = addWeeks(projectStart, node.startWeek)
     node.endDate = addWeeks(projectStart, node.endWeek)
   }
