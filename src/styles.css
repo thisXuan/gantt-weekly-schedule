@@ -509,6 +509,41 @@ h2 {
 .week-header div, .grid-lines i { border-right: 0; }
 .week-header b { color: var(--navy); font-size: 10px; font-weight: 700; }
 .week-header span { color: var(--muted); font-size: 9px; }
+.today-marker {
+  position: absolute;
+  top: var(--column-heading-height);
+  bottom: 0;
+  z-index: 7;
+  width: 2px;
+  background: #c65d4b;
+  pointer-events: none;
+}
+.today-marker::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c65d4b;
+}
+.today-marker > span {
+  position: absolute;
+  top: -28px;
+  left: 1px;
+  transform: translateX(-50%);
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: #c65d4b;
+  color: white;
+  font-size: 8px;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
 .legend { color: var(--muted); font-family: Inter, "Segoe UI", sans-serif; font-weight: 600; }
 .chapter-key { background: var(--navy); }
 .section-key { background: var(--blue); }
@@ -517,8 +552,8 @@ h2 {
 .bar.section { background: var(--blue); }
 .bar.task { background: var(--light-blue); color: var(--ink); }
 .bar { font-weight: 600; }
-.bar.chapter span { font-size: 13px; font-weight: 700; }
-.bar.section span { font-size: 12px; font-weight: 650; }
+.bar.chapter span { font-size: 16px; font-weight: 700; }
+.bar.section span { font-size: 15px; font-weight: 650; }
 .empty-marker { border-color: var(--blue); background: #f7f9fb; color: var(--blue); }
 .empty-marker.section { color: var(--blue); }
 .empty-marker.task { color: var(--light-blue); }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 const WEEK_WIDTH = 64
+const DAY_IN_MS = 24 * 60 * 60 * 1000
 
 async function request(path, options) {
   const response = await fetch(path, {
@@ -29,6 +30,12 @@ function findItem(items, id) {
 }
 
 const formatDate = (value) => new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`))
+const localDateString = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 function Icon({ name }) {
   const paths = {
@@ -60,7 +67,11 @@ function App() {
 
   const rows = useMemo(() => plan ? flatten(plan.items, collapsed) : [], [plan, collapsed])
   const allRows = useMemo(() => plan ? flatten(plan.items) : [], [plan])
-  const weeks = Math.max(8, (plan?.totalWeeks || 0) + 2, Math.ceil(timelineWidth / WEEK_WIDTH))
+  const today = localDateString(new Date())
+  const todayWeek = plan && today > plan.start_date
+    ? (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${plan.start_date}T00:00:00Z`)) / DAY_IN_MS / 7
+    : null
+  const weeks = Math.max(8, (plan?.totalWeeks || 0) + 2, Math.ceil(timelineWidth / WEEK_WIDTH), todayWeek === null ? 0 : Math.ceil(todayWeek) + 1)
 
   useEffect(() => {
     const timeline = chartScrollRef.current
@@ -248,6 +259,7 @@ function App() {
                 {Array.from({ length: weeks }, (_, index) => <div key={index}><b>W{index + 1}</b><span>{formatDate(new Date(Date.parse(`${plan.start_date}T00:00:00Z`) + index * 604800000).toISOString().slice(0, 10))}</span></div>)}
               </div>
               <div className="grid-lines">{Array.from({ length: weeks }, (_, index) => <i key={index} />)}</div>
+              {todayWeek !== null && <div className="today-marker" style={{ left: todayWeek * WEEK_WIDTH }} title={`Today · ${formatDate(today)}`}><span>Today</span></div>}
               <div className="bars">
                 {rows.map((item) => <div key={item.id} className="bar-row">
                   {item.durationWeeks > 0 && item.scheduled !== false && <div className={`bar ${item.type}`} style={{ left: item.startWeek * WEEK_WIDTH, width: Math.max(item.durationWeeks * WEEK_WIDTH, 14) }} title={`${item.name}: ${item.startDate} to ${item.endDate}`} aria-label={`${item.name}: ${item.startDate} to ${item.endDate}`}>{item.type !== 'task' && <span>{item.name}</span>}</div>}
