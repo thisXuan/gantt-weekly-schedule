@@ -62,6 +62,34 @@ const plan = () => {
   return { ...config, ...buildPlan(db.prepare('SELECT * FROM items ORDER BY position, id').all(), config.start_date) }
 }
 const getItem = (id) => db.prepare('SELECT * FROM items WHERE id = ?').get(id)
+const undoStack = []
+const snapshot = () => ({
+  settings: settings(),
+  items: db.prepare('SELECT * FROM items ORDER BY id').all(),
+})
+const remember = (state) => {
+  undoStack.push(state)
+  if (undoStack.length > 100) undoStack.shift()
+}
+const restore = (state) => {
+  db.exec('BEGIN')
+  try {
+    db.exec('DELETE FROM items')
+    const updateSetting = db.prepare('UPDATE settings SET value = ? WHERE key = ?')
+    Object.entries(state.settings).forEach(([key, value]) => updateSetting.run(value, key))
+    const insert = db.prepare(`
+      INSERT INTO items(id, type, parent_id, name, duration_weeks, manual_start_date, position, depends_on_id, start_mode)
+      VALUES (?, ?, NULL, ?, ?, ?, ?, NULL, ?)
+    `)
+    state.items.forEach((item) => insert.run(item.id, item.type, item.name, item.duration_weeks, item.manual_start_date, item.position, item.start_mode))
+    const reconnect = db.prepare('UPDATE items SET parent_id = ?, depends_on_id = ? WHERE id = ?')
+    state.items.forEach((item) => reconnect.run(item.parent_id, item.depends_on_id, item.id))
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+}
 const findPlanItem = (nodes, id) => {
   for (const node of nodes) {
     if (node.id === id) return node
@@ -78,6 +106,12 @@ function validateParent(type, parentId) {
   if (!parent) throw new Error('Parent not found.')
   if (type === 'section' && parent.type !== 'chapter') throw new Error('A section must be inside a chapter.')
   if (type === 'task' && parent.type !== 'section') throw new Error('A task must be inside a section.')
+}
+
+function normalizeDuration(value) {
+  const weeks = Number(value)
+  if (!Number.isFinite(weeks)) throw new Error('Duration must be a number of weeks.')
+  return Math.max(1, Math.round(weeks))
 }
 
 function validateLink(item, dependsOnId) {
@@ -106,7 +140,20 @@ function validateLink(item, dependsOnId) {
 async function api(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/plan') return json(res, 200, plan())
 
+  if (req.method === 'POST' && url.pathname === '/api/undo') {
+    const previous = undoStack.pop()
+    if (!previous) return json(res, 409, { error: 'Nothing to undo.' })
+    try {
+      restore(previous)
+      return json(res, 200, plan())
+    } catch (error) {
+      undoStack.push(previous)
+      throw error
+    }
+  }
+
   if (req.method === 'PATCH' && url.pathname === '/api/settings') {
+    const previous = snapshot()
     const input = await body(req)
     if (input.projectName !== undefined) {
       const name = String(input.projectName).trim()
@@ -117,7 +164,9 @@ async function api(req, res, url) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(input.startDate)) throw new Error('Choose a valid start date.')
       db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(input.startDate, 'start_date')
     }
-    return json(res, 200, plan())
+    const nextPlan = plan()
+    remember(previous)
+    return json(res, 200, nextPlan)
   }
 
   if (req.method === 'POST' && url.pathname === '/api/items') {
@@ -128,7 +177,7 @@ async function api(req, res, url) {
     validateParent(type, parentId)
     const name = String(input.name || `New ${type}`).trim()
     const duration = input.durationWeeks
-      ? Math.max(1, Number(input.durationWeeks))
+      ? normalizeDuration(input.durationWeeks)
       : null
     const isFirstChild = parentId
       ? db.prepare('SELECT COUNT(*) AS count FROM items WHERE parent_id = ?').get(parentId).count === 0
@@ -138,11 +187,14 @@ async function api(req, res, url) {
     const startMode = (type === 'task' && input.startMode === 'section_start') || (type === 'section' && input.startMode === 'chapter_start')
       ? 'section_start'
       : null
+    const previous = snapshot()
     const result = db.prepare('INSERT INTO items(type, parent_id, name, duration_weeks, manual_start_date, position, start_mode) VALUES (?, ?, ?, ?, ?, ?, ?)').run(type, parentId, name, duration, manualStartDate, position, startMode)
     if (isFirstChild) {
       db.prepare('UPDATE items SET manual_start_date = NULL, depends_on_id = NULL, start_mode = NULL WHERE id = ?').run(parentId)
     }
-    return json(res, 201, { ...plan(), createdId: Number(result.lastInsertRowid) })
+    const nextPlan = plan()
+    remember(previous)
+    return json(res, 201, { ...nextPlan, createdId: Number(result.lastInsertRowid) })
   }
 
   const match = url.pathname.match(/^\/api\/items\/(\d+)$/)
@@ -150,12 +202,13 @@ async function api(req, res, url) {
     const id = Number(match[1])
     const current = getItem(id)
     if (!current) return json(res, 404, { error: 'Item not found.' })
+    const previous = snapshot()
     const input = await body(req)
     const name = input.name === undefined ? current.name : String(input.name).trim()
     if (!name) throw new Error('Name is required.')
     const duration = input.durationWeeks === undefined
       ? current.duration_weeks
-      : (input.durationWeeks === '' || input.durationWeeks === null ? null : Math.max(1, Number(input.durationWeeks) || 1))
+      : (input.durationWeeks === '' || input.durationWeeks === null ? null : normalizeDuration(input.durationWeeks))
     let dependsOnId = input.dependsOnId === undefined ? current.depends_on_id : (input.dependsOnId ? Number(input.dependsOnId) : null)
     let startMode = input.startMode === undefined ? current.start_mode : null
     if (current.type === 'task' && input.startMode === 'section_start') startMode = 'section_start'
@@ -190,17 +243,22 @@ async function api(req, res, url) {
       }
     }
     try {
-      return json(res, 200, plan())
+      const nextPlan = plan()
+      remember(previous)
+      return json(res, 200, nextPlan)
     } catch (error) {
-      db.prepare('UPDATE items SET depends_on_id = ?, start_mode = ? WHERE id = ?').run(current.depends_on_id, current.start_mode, id)
+      restore(previous)
       throw error
     }
   }
   if (match && req.method === 'DELETE') {
     const id = Number(match[1])
     if (!getItem(id)) return json(res, 404, { error: 'Item not found.' })
+    const previous = snapshot()
     db.prepare('DELETE FROM items WHERE id = ?').run(id)
-    return json(res, 200, plan())
+    const nextPlan = plan()
+    remember(previous)
+    return json(res, 200, nextPlan)
   }
   return json(res, 404, { error: 'Not found.' })
 }

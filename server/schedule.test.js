@@ -56,3 +56,17 @@ test('groups span their children without double-counting overlaps', () => {
   assert.equal(chapter.children[1].durationWeeks, 4)
   assert.equal(chapter.durationWeeks, 9)
 })
+
+test('all durations snap to whole-week boundaries', () => {
+  const plan = buildPlan([
+    makeRow(1, 'chapter', null, null, 0),
+    makeRow(2, 'section', 1, null, 0),
+    makeRow(3, 'task', 2, 2.6, 0),
+  ], START)
+  const task = plan.items[0].children[0].children[0]
+
+  assert.equal(task.durationWeeks, 3)
+  assert.equal(task.startWeek, 0)
+  assert.equal(task.endWeek, 3)
+  assert.equal(plan.items[0].children[0].durationWeeks, 3)
+})

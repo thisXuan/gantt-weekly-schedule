@@ -42,7 +42,7 @@ export function buildPlan(rows, projectStart) {
     if (node.type === 'task') return [node]
     return node.children.flatMap(descendants)
   }
-  const duration = (task) => Math.max(0, Number(task.durationWeeks) || 0)
+  const duration = (item) => Math.max(0, Math.round(Number(item.durationWeeks) || 0))
   const starts = new Array(tasks.length).fill(0)
   const ends = new Array(tasks.length).fill(0)
   const scheduled = new Array(tasks.length).fill(false)
@@ -138,6 +138,7 @@ export function buildPlan(rows, projectStart) {
   tasks.forEach((_task, index) => schedule(index))
 
   tasks.forEach((task, index) => {
+    task.durationWeeks = duration(task)
     task.scheduled = scheduled[index]
     task.startWeek = starts[index]
     task.endWeek = ends[index]
@@ -180,6 +181,7 @@ export function buildPlan(rows, projectStart) {
       }
     }
     const groupDuration = node.children.length ? 0 : duration(node)
+    if (!node.children.length) node.durationWeeks = groupDuration
     node.startWeek = startWeek
     node.endWeek = startWeek + groupDuration
     node.startDate = addWeeks(projectStart, startWeek)

@@ -50,6 +50,8 @@ function App() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [timelineWidth, setTimelineWidth] = useState(0)
+  const [outlineWidth, setOutlineWidth] = useState(null)
+  const workspaceRef = useRef(null)
   const outlineScrollRef = useRef(null)
   const chartScrollRef = useRef(null)
 
@@ -80,6 +82,29 @@ function App() {
 
   const updateSettings = (patch) => mutate('/api/settings', { method: 'PATCH', body: JSON.stringify(patch) })
   const updateItem = (id, patch) => mutate(`/api/items/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
+  useEffect(() => {
+    const handleUndo = async (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.key.toLowerCase() !== 'z') return
+      const target = event.target
+      const isTextInput = target instanceof HTMLInputElement && ['text', 'search', 'email', 'url', 'tel', 'password'].includes(target.type)
+      if (isTextInput || target instanceof HTMLTextAreaElement || (target instanceof HTMLElement && target.isContentEditable)) return
+      event.preventDefault()
+      if (saving) return
+      setSaving(true)
+      setError('')
+      try {
+        setPlan(await request('/api/undo', { method: 'POST' }))
+        setMenuId(null)
+        setMenuAnchor(null)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setSaving(false)
+      }
+    }
+    window.addEventListener('keydown', handleUndo)
+    return () => window.removeEventListener('keydown', handleUndo)
+  }, [saving])
   const toggleCollapsed = (id) => setCollapsed((current) => {
     const next = new Set(current)
     if (next.has(id)) next.delete(id)
@@ -90,6 +115,21 @@ function App() {
     if (targetRef.current && targetRef.current.scrollTop !== event.currentTarget.scrollTop) {
       targetRef.current.scrollTop = event.currentTarget.scrollTop
     }
+  }
+  const resizeOutline = (clientX) => {
+    const workspace = workspaceRef.current
+    if (!workspace) return
+    const bounds = workspace.getBoundingClientRect()
+    const maximum = Math.max(300, bounds.width - 420)
+    setOutlineWidth(Math.min(maximum, Math.max(300, clientX - bounds.left)))
+  }
+  const resizeOutlineBy = (difference) => {
+    const workspace = workspaceRef.current
+    if (!workspace) return
+    const currentWidth = outlineWidth ?? workspace.querySelector('.outline')?.getBoundingClientRect().width ?? 380
+    const bounds = workspace.getBoundingClientRect()
+    const maximum = Math.max(300, bounds.width - 420)
+    setOutlineWidth(Math.min(maximum, Math.max(300, currentWidth + difference)))
   }
   const addItem = async (type, parentId = null) => {
     setSaving(true)
@@ -115,24 +155,12 @@ function App() {
 
   return (
     <main onClick={() => setMenuId(null)}>
-      <header className="topbar">
-        <div className="brand"><div className="brandmark"><Icon name="layers" /></div><span>WEEKLINE <em>Planning Register</em></span></div>
-        <div className="project-title">
-          <input aria-label="Project name" value={plan.project_name} onChange={(e) => setPlan({ ...plan, project_name: e.target.value })} onBlur={(e) => updateSettings({ projectName: e.target.value })} />
-          <span>{plan.totalWeeks} week plan</span>
-        </div>
-        <div className="start-control">
-          <Icon name="calendar" />
-          <label>Plan starts<input type="date" value={plan.start_date} onChange={(e) => updateSettings({ startDate: e.target.value })} /></label>
-        </div>
-      </header>
-
       {error && <div className="error"><span>{error}</span><button onClick={() => setError('')}>Dismiss</button></div>}
 
-      <section className="workspace" aria-busy={saving}>
+      <section className="workspace" ref={workspaceRef} aria-busy={saving} style={outlineWidth ? { '--outline-width': `${outlineWidth}px` } : undefined}>
         <aside className="outline">
           <div className="panel-heading">
-            <div><span className="eyebrow">WORK BREAKDOWN</span><h2>Plan outline</h2></div>
+            <div className="outline-heading-content"><span className="eyebrow">WORK BREAKDOWN</span><label className="outline-start"><Icon name="calendar" /><span>Plan starts</span><input type="date" value={plan.start_date} onChange={(e) => updateSettings({ startDate: e.target.value })} /></label></div>
             <button className="add-main" onClick={() => addItem('chapter')}><Icon name="plus" /> Add chapter</button>
           </div>
           <div className="column-head"><span>Work item</span><span>Weeks</span></div>
@@ -174,16 +202,44 @@ function App() {
                   {menuId === item.id && menuAnchor && createPortal(<InlineMenu item={item} rows={allRows} anchor={menuAnchor} onUpdate={(patch) => updateItem(item.id, patch)} onDelete={() => remove(item)} onClose={() => { setMenuId(null); setMenuAnchor(null) }} />, menuAnchor.target)}
                 </div>
                 <div className="duration-cell">
-                  {item.type === 'task' || item.children.length === 0 ? <input type="number" min="1" value={item.durationWeeks ?? ''} placeholder="—" aria-label={`${item.type} duration in weeks`} onClick={(e) => e.stopPropagation()} onChange={(e) => updateItem(item.id, { durationWeeks: e.target.value })} /> : <span>{item.durationWeeks}</span>}
+                  {item.type === 'task' || item.children.length === 0 ? <input type="number" min="1" step="1" value={item.durationWeeks ?? ''} placeholder="—" aria-label={`${item.type} duration in weeks`} onClick={(e) => e.stopPropagation()} onChange={(e) => updateItem(item.id, { durationWeeks: e.target.value })} /> : <span>{item.durationWeeks}</span>}
                 </div>
               </div>
             ))}
           </div>
         </aside>
 
+        <div
+          className="workspace-resizer"
+          role="separator"
+          aria-label="Resize work item panel"
+          aria-orientation="vertical"
+          aria-valuemin="300"
+          aria-valuenow={Math.round(outlineWidth || 380)}
+          tabIndex="0"
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture(event.pointerId)
+            document.body.classList.add('resizing-outline')
+            resizeOutline(event.clientX)
+          }}
+          onPointerMove={(event) => {
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) resizeOutline(event.clientX)
+          }}
+          onPointerUp={(event) => {
+            event.currentTarget.releasePointerCapture(event.pointerId)
+            document.body.classList.remove('resizing-outline')
+          }}
+          onPointerCancel={() => document.body.classList.remove('resizing-outline')}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+            event.preventDefault()
+            resizeOutlineBy(event.key === 'ArrowLeft' ? -16 : 16)
+          }}
+        />
+
         <section className="timeline">
           <div className="timeline-top">
-            <div><span className="eyebrow">SCHEDULE</span><h2>Weekly programme</h2></div>
+            <div className="timeline-title"><span className="eyebrow">SCHEDULE</span><input aria-label="Project name" value={plan.project_name} onChange={(e) => setPlan({ ...plan, project_name: e.target.value })} onBlur={(e) => updateSettings({ projectName: e.target.value })} /></div>
             <div className="legend"><i className="chapter-key" />Chapter <i className="section-key" />Section <i className="task-key" />Task</div>
           </div>
           <div className="chart-scroll" ref={chartScrollRef} onScroll={(event) => syncVerticalScroll(event, outlineScrollRef)}>
