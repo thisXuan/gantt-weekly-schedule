@@ -152,11 +152,10 @@ export function buildPlan(rows, projectStart) {
       if (childTasks.length) {
         node.startWeek = Math.min(...childTasks.map((task) => task.startWeek))
         node.endWeek = Math.max(...childTasks.map((task) => task.endWeek))
-        node.durationWeeks = node.endWeek - node.startWeek
+        node.durationWeeks = childTasks.reduce((total, task) => total + duration(task), 0)
+        node.endWeek = node.startWeek + node.durationWeeks
         node.startDate = addWeeks(projectStart, node.startWeek)
         node.endDate = addWeeks(projectStart, node.endWeek)
-      } else {
-        node.durationWeeks = 0
       }
     }
   }
@@ -164,46 +163,32 @@ export function buildPlan(rows, projectStart) {
 
   const emptyGroupState = new Map()
   const resolveGroupStart = (node) => {
-    if (node.durationWeeks > 0) return node.endWeek
+    if (node.startWeek !== undefined) return node.endWeek
     if (emptyGroupState.get(node.id) === 2) return node.endWeek
     if (emptyGroupState.get(node.id) === 1) throw new Error('The links create a circular schedule. Remove one of the circular links.')
     emptyGroupState.set(node.id, 1)
     let startWeek = weeksBetween(projectStart, node.manualStartDate || projectStart)
-    const containsTasks = descendants(node).length > 0
     if (node.type === 'section' && node.startMode === 'section_start') {
       const chapter = byId.get(node.parentId)
       startWeek = chapter?.startWeek ?? weeksBetween(projectStart, chapter?.manualStartDate || projectStart)
     }
-    if (containsTasks && node.dependsOnId) {
+    if (node.dependsOnId) {
       const target = byId.get(node.dependsOnId)
       if (target?.type === 'task') {
-        if (target.scheduled) startWeek = target.endWeek
+        startWeek = target.endWeek
       } else if (target) {
         startWeek = resolveGroupStart(target)
       }
     }
+    const groupDuration = node.children.length ? 0 : duration(node)
     node.startWeek = startWeek
-    node.endWeek = startWeek
+    node.endWeek = startWeek + groupDuration
     node.startDate = addWeeks(projectStart, startWeek)
-    node.endDate = node.startDate
+    node.endDate = addWeeks(projectStart, node.endWeek)
     emptyGroupState.set(node.id, 2)
-    return startWeek
+    return node.endWeek
   }
   for (const item of items.filter((candidate) => candidate.type !== 'task')) resolveGroupStart(item)
-
-  // An empty section cannot begin before its chapter. This also normalizes
-  // older saved plans that predate the constraint.
-  for (const chapter of roots) {
-    for (const section of chapter.children.filter((child) => child.type === 'section')) {
-      if (section.durationWeeks === 0 && section.startWeek < chapter.startWeek) {
-        section.startWeek = chapter.startWeek
-        section.endWeek = chapter.startWeek
-        section.startDate = chapter.startDate
-        section.endDate = chapter.startDate
-        section.manualStartDate = chapter.startDate
-      }
-    }
-  }
 
   // Unscheduled tasks use their section's start as the position of their
   // placeholder. Once linked, their own dependency determines the real dates.
@@ -215,23 +200,21 @@ export function buildPlan(rows, projectStart) {
     task.endDate = addWeeks(projectStart, task.endWeek)
   }
 
-  // Parent ranges always reflect their tasks. Placeholder tasks contribute
-  // their duration even though they do not render as scheduled task bars.
+  // A group with children is always derived. Leaf groups retain their own
+  // duration, while parent lengths are the sum of their immediate children.
   const resummarize = (node) => {
     node.children.forEach(resummarize)
-    if (node.type === 'task') return
-    const childTasks = descendants(node)
-    if (!childTasks.length) return
-    node.startWeek = Math.min(...childTasks.map((task) => task.startWeek))
-    node.endWeek = Math.max(...childTasks.map((task) => task.endWeek))
-    node.durationWeeks = node.endWeek - node.startWeek
+    if (node.type === 'task' || !node.children.length) return
+    node.startWeek = Math.min(...node.children.map((child) => child.startWeek))
+    node.durationWeeks = node.children.reduce((total, child) => total + duration(child), 0)
+    node.endWeek = node.startWeek + node.durationWeeks
     node.startDate = addWeeks(projectStart, node.startWeek)
     node.endDate = addWeeks(projectStart, node.endWeek)
   }
   roots.forEach(resummarize)
 
-  const taskEnds = tasks.map((task) => task.endWeek)
-  return { items: roots, totalWeeks: taskEnds.length ? Math.max(...taskEnds) : 0 }
+  const itemEnds = items.map((item) => item.endWeek || 0)
+  return { items: roots, totalWeeks: itemEnds.length ? Math.max(...itemEnds) : 0 }
 }
 
 export function weeksBetween(start, end) {

@@ -9,7 +9,8 @@
     "dev:client": "vite",
     "build": "vite build",
     "start": "node server/index.js",
-    "check": "eslint . && vite build"
+    "check": "eslint . && vite build",
+    "test": "node --test"
   },
   "dependencies": {
     "@eslint/js": "latest",

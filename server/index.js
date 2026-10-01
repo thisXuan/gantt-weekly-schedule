@@ -45,22 +45,6 @@ if (count === 0) {
   `)
 }
 
-function clearEmptyGroupLinks() {
-  db.exec(`
-    UPDATE items SET depends_on_id = NULL
-    WHERE type = 'section' AND NOT EXISTS (
-      SELECT 1 FROM items task WHERE task.parent_id = items.id AND task.type = 'task'
-    );
-    UPDATE items SET depends_on_id = NULL
-    WHERE type = 'chapter' AND NOT EXISTS (
-      SELECT 1 FROM items section
-      JOIN items task ON task.parent_id = section.id AND task.type = 'task'
-      WHERE section.parent_id = items.id AND section.type = 'section'
-    );
-  `)
-}
-clearEmptyGroupLinks()
-
 const json = (res, status, data) => {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
   res.end(JSON.stringify(data))
@@ -113,6 +97,10 @@ function validateLink(item, dependsOnId) {
     task: ['task'],
   }
   if (!allowed[item.type].includes(target.type)) throw new Error(`A ${item.type} cannot link to a ${target.type}.`)
+  const hasChildren = db.prepare('SELECT 1 FROM items WHERE parent_id = ? LIMIT 1').get(item.id)
+  if (item.type !== 'task' && !hasChildren && target.type !== 'task') {
+    throw new Error(`An empty ${item.type} can only link to a task.`)
+  }
 }
 
 async function api(req, res, url) {
@@ -139,15 +127,21 @@ async function api(req, res, url) {
     const parentId = input.parentId ? Number(input.parentId) : null
     validateParent(type, parentId)
     const name = String(input.name || `New ${type}`).trim()
-    const duration = type === 'task' && input.durationWeeks
+    const duration = input.durationWeeks
       ? Math.max(1, Number(input.durationWeeks))
       : null
+    const isFirstChild = parentId
+      ? db.prepare('SELECT COUNT(*) AS count FROM items WHERE parent_id = ?').get(parentId).count === 0
+      : false
     const position = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next FROM items WHERE parent_id IS ?').get(parentId).next
     const manualStartDate = type === 'task' ? null : settings().start_date
     const startMode = (type === 'task' && input.startMode === 'section_start') || (type === 'section' && input.startMode === 'chapter_start')
       ? 'section_start'
       : null
     const result = db.prepare('INSERT INTO items(type, parent_id, name, duration_weeks, manual_start_date, position, start_mode) VALUES (?, ?, ?, ?, ?, ?, ?)').run(type, parentId, name, duration, manualStartDate, position, startMode)
+    if (isFirstChild) {
+      db.prepare('UPDATE items SET manual_start_date = NULL, depends_on_id = NULL, start_mode = NULL WHERE id = ?').run(parentId)
+    }
     return json(res, 201, { ...plan(), createdId: Number(result.lastInsertRowid) })
   }
 
@@ -159,11 +153,9 @@ async function api(req, res, url) {
     const input = await body(req)
     const name = input.name === undefined ? current.name : String(input.name).trim()
     if (!name) throw new Error('Name is required.')
-    const duration = current.type === 'task'
-      ? (input.durationWeeks === undefined
-          ? current.duration_weeks
-          : (input.durationWeeks === '' || input.durationWeeks === null ? null : Math.max(1, Number(input.durationWeeks) || 1)))
-      : null
+    const duration = input.durationWeeks === undefined
+      ? current.duration_weeks
+      : (input.durationWeeks === '' || input.durationWeeks === null ? null : Math.max(1, Number(input.durationWeeks) || 1))
     let dependsOnId = input.dependsOnId === undefined ? current.depends_on_id : (input.dependsOnId ? Number(input.dependsOnId) : null)
     let startMode = input.startMode === undefined ? current.start_mode : null
     if (current.type === 'task' && input.startMode === 'section_start') startMode = 'section_start'
@@ -208,7 +200,6 @@ async function api(req, res, url) {
     const id = Number(match[1])
     if (!getItem(id)) return json(res, 404, { error: 'Item not found.' })
     db.prepare('DELETE FROM items WHERE id = ?').run(id)
-    clearEmptyGroupLinks()
     return json(res, 200, plan())
   }
   return json(res, 404, { error: 'Not found.' })

@@ -11,7 +11,8 @@ Weekline is a local-first weekly planning application that turns a structured pl
 - Link chapters, sections, and tasks with finish-to-start dependencies.
 - Start a task with its parent section using **Section start**.
 - Start a section with its parent chapter using **Chapter start**.
-- Set a planned start date for chapters and sections that do not contain tasks.
+- Give an empty chapter or section its own start date (or link it after an existing task) and duration.
+- Automatically replace a chapter or section's manual duration with the summed duration of its children.
 - Collapse chapters and sections to focus on the work you need.
 - Store the entire plan locally in SQLite—no account or external database server required.
 

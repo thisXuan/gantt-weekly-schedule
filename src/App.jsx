@@ -163,7 +163,7 @@ function App() {
                   {menuId === item.id && menuAnchor && createPortal(<InlineMenu item={item} rows={allRows} anchor={menuAnchor} onUpdate={(patch) => updateItem(item.id, patch)} onDelete={() => remove(item)} onClose={() => { setMenuId(null); setMenuAnchor(null) }} />, menuAnchor.target)}
                 </div>
                 <div className="duration-cell">
-                  {item.type === 'task' ? <input type="number" min="1" value={item.durationWeeks ?? ''} placeholder="—" aria-label="Duration in weeks" onClick={(e) => e.stopPropagation()} onChange={(e) => updateItem(item.id, { durationWeeks: e.target.value })} /> : <span>{item.durationWeeks}</span>}
+                  {item.type === 'task' || item.children.length === 0 ? <input type="number" min="1" value={item.durationWeeks ?? ''} placeholder="—" aria-label={`${item.type} duration in weeks`} onClick={(e) => e.stopPropagation()} onChange={(e) => updateItem(item.id, { durationWeeks: e.target.value })} /> : <span>{item.durationWeeks}</span>}
                 </div>
               </div>
             ))}
@@ -186,7 +186,7 @@ function App() {
                   {item.durationWeeks > 0 && item.scheduled !== false && <div className={`bar ${item.type}`} style={{ left: item.startWeek * WEEK_WIDTH + 5, width: Math.max(item.durationWeeks * WEEK_WIDTH - 10, 14) }} title={`${item.name}: ${item.startDate} to ${item.endDate}`}>
                     <span>{item.name}</span>{item.type === 'task' && <small>{item.durationWeeks}w</small>}
                   </div>}
-                  {((item.type !== 'task' && item.durationWeeks === 0) || (item.type === 'task' && item.scheduled === false)) && <div className={`empty-marker ${item.type}`} style={{ left: item.startWeek * WEEK_WIDTH + 25 }} title={item.type === 'task' ? `${item.name}: choose a predecessor` : `${item.name}: starts ${item.startDate}`}><span /></div>}
+                  {((item.type !== 'task' && !item.durationWeeks) || (item.type === 'task' && item.scheduled === false)) && <div className={`empty-marker ${item.type}`} style={{ left: item.startWeek * WEEK_WIDTH + 25 }} title={item.type === 'task' ? `${item.name}: choose a predecessor` : `${item.name}: starts ${item.startDate}`}><span /></div>}
                 </div>)}
               </div>
             </div>
@@ -214,11 +214,9 @@ function InlineMenu({ item, rows, anchor, onUpdate, onDelete, onClose }) {
     }
     return false
   }
-  const options = rows.filter((row) => row.id !== item.id && allowedTypes.includes(row.type) && !isInsideItem(row))
-  const hasTask = item.type === 'task' || flatten(item.children).some((child) => child.type === 'task')
-  const isEmptyGroup = item.type !== 'task' && !hasTask
+  const isLeafGroup = item.type !== 'task' && item.children.length === 0
+  const options = rows.filter((row) => row.id !== item.id && (isLeafGroup ? row.type === 'task' : allowedTypes.includes(row.type)) && !isInsideItem(row))
   const isFirstTask = item.type === 'task' && rows.find((row) => row.type === 'task')?.id === item.id
-  const parent = item.type === 'section' ? rows.find((row) => row.id === item.parentId) : null
   const parentStartOption = item.type === 'task' ? '__section_start__' : item.type === 'section' ? '__chapter_start__' : null
   const startAfterValue = item.startMode === 'section_start' && parentStartOption ? parentStartOption : (item.dependsOnId || '')
   const updateStartAfter = (value) => {
@@ -229,9 +227,12 @@ function InlineMenu({ item, rows, anchor, onUpdate, onDelete, onClose }) {
   const position = anchor.openUp ? { left: anchor.left, bottom: anchor.bottom } : { left: anchor.left, top: anchor.top }
   return <div className={`inline-menu ${anchor.openUp ? 'open-up' : ''}`} style={position} onClick={(e) => e.stopPropagation()}>
     <div className="inline-menu-head"><div><span>{item.type}</span><b>{item.name}</b></div><button aria-label="Close" onClick={onClose}>×</button></div>
-    <div className="inline-dates">{item.type === 'task' && item.scheduled === false ? <span className="unscheduled-label">Not scheduled</span> : <><span>{formatDate(item.startDate)}</span><i>→</i><span>{formatDate(item.endDate)}</span><em>{item.durationWeeks}w</em></>}</div>
-    {isEmptyGroup && <label className="field manual-date"><span><Icon name="calendar" />Planned start</span><input type="date" min={parent?.startDate} value={item.manualStartDate || item.startDate} onChange={(e) => onUpdate({ manualStartDate: e.target.value, dependsOnId: null })} /><small>{parent ? `Cannot be earlier than ${parent.name} (${formatDate(parent.startDate)}).` : `Used until this ${item.type} contains a task.`}</small></label>}
-    {!isEmptyGroup && <label className="field"><span><Icon name="link" />Starts after</span><select value={startAfterValue} onChange={(e) => updateStartAfter(e.target.value)}><option value="">{isFirstTask ? 'Plan start' : item.type === 'task' ? 'Not scheduled' : 'No link'}</option>{item.type === 'task' && <option value="__section_start__">Section start</option>}{item.type === 'section' && <option value="__chapter_start__">Chapter start</option>}{options.map((option) => <option key={option.id} value={option.id}>{option.type} · {option.name}</option>)}</select></label>}
+    <div className="inline-dates">{item.type === 'task' && item.scheduled === false ? <span className="unscheduled-label">Not scheduled</span> : <><span>{formatDate(item.startDate)}</span><i>→</i><span>{formatDate(item.endDate)}</span><em>{item.durationWeeks || 0}w</em></>}</div>
+    {isLeafGroup && <>
+      <label className="field"><span><Icon name="link" />Start method</span><select value={item.dependsOnId || ''} onChange={(e) => onUpdate({ dependsOnId: e.target.value || null })}><option value="">Concrete date</option>{options.map((option) => <option key={option.id} value={option.id}>After task · {option.name}</option>)}</select></label>
+      {!item.dependsOnId && <label className="field manual-date"><span><Icon name="calendar" />Concrete start date</span><input type="date" value={item.manualStartDate || item.startDate} onChange={(e) => onUpdate({ manualStartDate: e.target.value, dependsOnId: null })} /><small>{`Used while this ${item.type} has no children.`}</small></label>}
+    </>}
+    {!isLeafGroup && <label className="field"><span><Icon name="link" />Starts after</span><select value={startAfterValue} onChange={(e) => updateStartAfter(e.target.value)}><option value="">{isFirstTask ? 'Plan start' : item.type === 'task' ? 'Not scheduled' : 'No link'}</option>{item.type === 'task' && <option value="__section_start__">Section start</option>}{item.type === 'section' && <option value="__chapter_start__">Chapter start</option>}{options.map((option) => <option key={option.id} value={option.id}>{option.type} · {option.name}</option>)}</select></label>}
     <button className="inline-delete" onClick={onDelete}><Icon name="trash" />Delete {item.type}</button>
   </div>
 }
