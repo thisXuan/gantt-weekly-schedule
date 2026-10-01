@@ -49,6 +49,7 @@ function App() {
   const [collapsed, setCollapsed] = useState(new Set())
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [timelineWidth, setTimelineWidth] = useState(0)
   const outlineScrollRef = useRef(null)
   const chartScrollRef = useRef(null)
 
@@ -57,7 +58,17 @@ function App() {
 
   const rows = useMemo(() => plan ? flatten(plan.items, collapsed) : [], [plan, collapsed])
   const allRows = useMemo(() => plan ? flatten(plan.items) : [], [plan])
-  const weeks = Math.max(8, (plan?.totalWeeks || 0) + 2)
+  const weeks = Math.max(8, (plan?.totalWeeks || 0) + 2, Math.ceil(timelineWidth / WEEK_WIDTH))
+
+  useEffect(() => {
+    const timeline = chartScrollRef.current
+    if (!plan || !timeline) return undefined
+    const updateWidth = () => setTimelineWidth(timeline.clientWidth)
+    updateWidth()
+    const observer = new ResizeObserver(updateWidth)
+    observer.observe(timeline)
+    return () => observer.disconnect()
+  }, [plan])
 
   const mutate = async (path, options) => {
     setSaving(true)
@@ -183,9 +194,7 @@ function App() {
               <div className="grid-lines">{Array.from({ length: weeks }, (_, index) => <i key={index} />)}</div>
               <div className="bars">
                 {rows.map((item) => <div key={item.id} className="bar-row">
-                  {item.durationWeeks > 0 && item.scheduled !== false && <div className={`bar ${item.type}`} style={{ left: item.startWeek * WEEK_WIDTH + 5, width: Math.max(item.durationWeeks * WEEK_WIDTH - 10, 14) }} title={`${item.name}: ${item.startDate} to ${item.endDate}`}>
-                    <span>{item.name}</span>{item.type === 'task' && <small>{item.durationWeeks}w</small>}
-                  </div>}
+                  {item.durationWeeks > 0 && item.scheduled !== false && <div className={`bar ${item.type}`} style={{ left: item.startWeek * WEEK_WIDTH, width: Math.max(item.durationWeeks * WEEK_WIDTH, 14) }} title={`${item.name}: ${item.startDate} to ${item.endDate}`} aria-label={`${item.name}: ${item.startDate} to ${item.endDate}`} />}
                   {((item.type !== 'task' && !item.durationWeeks) || (item.type === 'task' && item.scheduled === false)) && <div className={`empty-marker ${item.type}`} style={{ left: item.startWeek * WEEK_WIDTH + 25 }} title={item.type === 'task' ? `${item.name}: choose a predecessor` : `${item.name}: starts ${item.startDate}`}><span /></div>}
                 </div>)}
               </div>

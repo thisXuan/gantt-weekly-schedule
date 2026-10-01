@@ -238,6 +238,25 @@ h2 { font: 600 20px Georgia, serif; letter-spacing: 0; }
 .bar { cursor: default; }
 .empty-marker { cursor: default; }
 
+/* Full-row Gantt treatment. */
+.week-header div, .grid-lines i { border-right: 0; }
+.bar {
+  top: 0;
+  height: 100%;
+  border-radius: 0;
+}
+.bar.chapter,
+.bar.section,
+.bar.task {
+  top: 0;
+  height: 100%;
+}
+.bar.chapter { padding: 0 8px; background: #26435f; color: white; }
+.bar.chapter::before, .bar.chapter::after { content: none; }
+.bar.section { background: #6389aa; color: white; }
+.bar.task { background: #aac3d9; color: #17243a; }
+.bar:hover { transform: none; }
+
 /* Keep the outline and timeline on one responsive vertical rhythm. */
 :root {
   --topbar-height: 92px;
@@ -298,3 +317,194 @@ main { height: 100dvh; min-height: 0; overflow: hidden; }
   .workspace { grid-template-columns: clamp(340px, 38vw, 390px) minmax(0, 1fr); }
   .topbar { grid-template-columns: 250px minmax(240px, 1fr) auto; padding-inline: 18px; }
 }
+
+/* Business blue interface */
+:root {
+  --ink: #1d3042;
+  --muted: #6c7d8c;
+  --paper: #f3f6f8;
+  --sheet: #ffffff;
+  --rule: #d7e0e7;
+  --accent: #426f94;
+  --navy: #26435f;
+  --blue: #6389aa;
+  --light-blue: #aac3d9;
+  font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+body { background: var(--paper); }
+
+.topbar {
+  border-top: 0;
+  border-bottom: 1px solid var(--rule);
+  background: var(--sheet);
+  box-shadow: 0 1px 3px #1d30420a;
+}
+.brand {
+  gap: 12px;
+  color: var(--navy);
+  font: 700 12px/1.1 Inter, "Segoe UI", sans-serif;
+  letter-spacing: .12em;
+}
+.brand em {
+  color: var(--blue);
+  font: 600 9px/1 Inter, "Segoe UI", sans-serif;
+  letter-spacing: .12em;
+}
+.brandmark {
+  border: 0;
+  border-radius: 4px;
+  background: var(--navy);
+  color: white;
+  box-shadow: 0 3px 8px #26435f24;
+}
+.project-title input {
+  color: var(--ink);
+  font: 600 22px Inter, "Segoe UI", sans-serif;
+}
+.project-title span {
+  color: var(--muted);
+  font-family: Inter, "Segoe UI", sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+}
+.start-control {
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: #f8fafb;
+  box-shadow: none;
+}
+.start-control svg { color: var(--blue); }
+.start-control input { color: var(--ink); }
+
+.workspace { background: var(--paper); }
+.outline {
+  border-right: 1px solid var(--rule);
+  background: var(--sheet);
+}
+.timeline { background: #f7f9fb; }
+.panel-heading, .timeline-top {
+  border-bottom: 1px solid var(--rule);
+  background: var(--sheet);
+}
+.eyebrow {
+  color: var(--blue);
+  font-family: Inter, "Segoe UI", sans-serif;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+h2 {
+  color: var(--ink);
+  font: 650 20px/1.2 Inter, "Segoe UI", sans-serif;
+  letter-spacing: -.015em;
+}
+.add-main, .add-children button {
+  border: 1px solid var(--navy);
+  border-radius: 4px;
+  background: var(--navy);
+  color: white;
+  font-weight: 650;
+  letter-spacing: .05em;
+  box-shadow: 0 2px 5px #26435f1f;
+}
+.add-main:hover, .add-children button:hover { background: #1f3850; }
+
+.column-head {
+  border-bottom: 1px solid var(--rule);
+  background: #f3f6f8;
+  color: var(--muted);
+  font-family: Inter, "Segoe UI", sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+}
+.outline-row, .bar-row { border-bottom: 1px solid var(--rule); }
+.outline-row:hover, .outline-row.selected { background: #f4f8fb; }
+.outline-row.selected::before { background: var(--blue); }
+.chapter .item-name input,
+.section .item-name input,
+.task .item-name input {
+  color: var(--ink);
+  font-family: Inter, "Segoe UI", sans-serif;
+}
+.chapter .item-name input { font-size: 15px; font-weight: 700; }
+.section .item-name input { font-size: 14px; font-weight: 650; }
+.task .item-name input { font-size: 13px; font-weight: 500; }
+.task .type-mark { color: var(--light-blue); }
+.disclosure { color: var(--muted); }
+.disclosure:hover { color: var(--blue); }
+.duration-cell {
+  border-left: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 12px;
+}
+.duration-cell input { color: var(--ink); font-size: 12px; }
+.child-button, .more-button { color: #81909d; border-radius: 3px; }
+.child-button:hover, .more-button:hover { color: var(--navy); background: #e7eef3; }
+
+.week-header {
+  border-bottom: 1px solid #c8d4dd;
+  background: #eef3f6;
+}
+.week-header div, .grid-lines i { border-right: 0; }
+.week-header b { color: var(--navy); font-size: 10px; font-weight: 700; }
+.week-header span { color: var(--muted); font-size: 9px; }
+.legend { color: var(--muted); font-family: Inter, "Segoe UI", sans-serif; font-weight: 600; }
+.chapter-key { background: var(--navy); }
+.section-key { background: var(--blue); }
+.task-key { background: var(--light-blue); }
+.bar.chapter { background: var(--navy); }
+.bar.section { background: var(--blue); }
+.bar.task { background: var(--light-blue); color: var(--ink); }
+.bar { font-weight: 600; }
+.empty-marker { border-color: var(--blue); background: #f7f9fb; color: var(--blue); }
+.empty-marker.section { color: var(--blue); }
+.empty-marker.task { color: var(--light-blue); }
+
+.statusbar {
+  background: var(--navy);
+  color: #d9e4ec;
+  font-family: Inter, "Segoe UI", sans-serif;
+  letter-spacing: .06em;
+}
+.dot { background: #8fb3cf; }
+
+.inline-menu {
+  border: 1px solid #becbd5;
+  border-radius: 6px;
+  background: var(--sheet);
+  color: var(--ink);
+  box-shadow: 0 12px 32px #1d304229;
+}
+.inline-menu::before {
+  background: var(--sheet);
+  border-color: #becbd5;
+}
+.inline-menu-head { border-bottom-color: var(--rule); }
+.inline-menu-head span { color: var(--blue); }
+.inline-menu-head b { font: 650 14px Inter, "Segoe UI", sans-serif; }
+.inline-dates { font: 600 11px Inter, "Segoe UI", sans-serif; }
+.inline-dates em { background: #e7eef3; color: var(--navy); }
+.inline-menu .field > span { color: var(--ink); }
+.field select, .field input {
+  border: 1px solid #c8d4dd;
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+}
+.field select:focus, .field input:focus {
+  border-color: var(--blue);
+  outline: 2px solid #6389aa24;
+}
+.field small { color: var(--muted); }
+.inline-delete { color: #9e4050; }
+
+.error {
+  border-radius: 4px;
+  background: var(--navy);
+  box-shadow: 0 8px 24px #1d304233;
+}
+.error button { color: #c8dceb; }
+.loading { color: var(--muted); }
+.loading span { border-color: var(--rule); border-top-color: var(--blue); }
